@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Check, Upload, X } from 'lucide-react'
-import { Card, Tabs, SolutionChip, ProgressBar, OwnerTag, StatusBadge, Button } from '../components/UI'
+import { Check, Upload, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Card, Tabs, SolutionChip, OwnerTag, StatusBadge, Button } from '../components/UI'
 import SmartAssistant from '../components/SmartAssistant'
-import { ONBOARDING_STEPS_TEMPLATE, STATUS_CONFIG } from '../lib/constants'
+import StepForm from '../components/StepForm'
+import { STATUS_CONFIG } from '../lib/constants'
 
 const TABS = [
   { id: 'timeline', label: 'Ma Timeline' },
@@ -11,42 +12,50 @@ const TABS = [
 ]
 
 const REQUIRED_FILES = [
-  { name: 'BDC signé',              required: true },
-  { name: 'Attestation de mandat',  required: false },
-  { name: 'NDA',                    required: false },
-  { name: 'K-Bis',                  required: false },
+  { name: 'BDC signé',             required: true },
+  { name: 'Attestation de mandat', required: false },
+  { name: 'NDA',                   required: false },
+  { name: 'K-Bis',                 required: false },
 ]
 
-function buildSteps() {
-  const statuses = ['done','done','done','doing','doing','wait','todo','todo','todo']
-  return ONBOARDING_STEPS_TEMPLATE.map((s, i) => ({ ...s, status: statuses[i] || 'todo' }))
+function stepBg(status) {
+  if (status === 'done')    return '#13d275'
+  if (status === 'doing')   return '#EE0669'
+  if (status === 'blocked') return '#ff4861'
+  return '#D8DFE9'
+}
+function stepColor(status) {
+  return ['todo', 'wait'].includes(status) ? '#7f88ad' : '#fff'
 }
 
 export default function ClientView({ client }) {
-  const [tab, setTab]       = useState('timeline')
-  const [steps]             = useState(buildSteps)
-  const [files, setFiles]   = useState([{ name: 'BDC_Signed.pdf', size: 1230000, done: true }])
-  const [dragging, setDrag] = useState(false)
+  const [tab,       setTab]     = useState('timeline')
+  const [files,     setFiles]   = useState([{ name: 'BDC_Signed.pdf', size: 1230000, done: true }])
+  const [dragging,  setDrag]    = useState(false)
+  const [expandedId, setExpandedId] = useState(null)
 
-  const done = steps.filter(s => s.status === 'done').length
-  const pct  = Math.round((done / steps.length) * 100)
+  const steps = client.steps ?? []
+  const done  = steps.filter(s => s.status === 'done').length
+  const pct   = steps.length ? Math.round((done / steps.length) * 100) : 0
+
+  function toggleExpand(id) { setExpandedId(v => v === id ? null : id) }
 
   function handleDrop(e) {
     e.preventDefault(); setDrag(false)
-    const dropped = Array.from(e.dataTransfer.files).map(f => ({ name: f.name, size: f.size, done: true }))
-    setFiles(prev => [...prev, ...dropped])
+    setFiles(prev => [...prev, ...Array.from(e.dataTransfer.files).map(f => ({ name: f.name, size: f.size, done: true }))])
   }
-
-  function removeFile(name) { setFiles(prev => prev.filter(f => f.name !== name)) }
 
   return (
     <div className="animate-fade-in">
-      {/* Hero */}
+
+      {/* ── Hero ── */}
       <div className="rounded-2xl p-5 mb-5 text-white" style={{ background: 'linear-gradient(135deg,#EE0669 0%,#ff6b9d 100%)' }}>
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-lg font-bold">Bienvenue, {client.name} 👋</div>
-            <div className="text-[12px] opacity-85">Votre onboarding est en cours · {done}/{steps.length} étapes complétées</div>
+            <div className="text-[12px] opacity-85">
+              Votre onboarding est en cours · {done}/{steps.length} étapes complétées
+            </div>
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold">{pct}%</div>
@@ -64,62 +73,74 @@ export default function ClientView({ client }) {
         </div>
       </div>
 
-      {/* Smart Assistant */}
+      {/* ── Smart Assistant ── */}
       <SmartAssistant clientName={client.name} />
 
-      {/* Tabs */}
+      {/* ── Tabs ── */}
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-      {/* Timeline */}
+      {/* ── Timeline ── */}
       {tab === 'timeline' && (
-        <div className="space-y-0">
-          {steps.map((step, i) => {
-            const cfg = STATUS_CONFIG[step.status]
-            const isLast = i === steps.length - 1
+        <Card className="p-0 overflow-hidden">
+          <div className="px-4 py-3 border-b border-border text-[11px] text-info">
+            Cliquez sur une étape pour voir le détail et renseigner les informations demandées.
+          </div>
+
+          {steps.map(step => {
+            const isOpen = expandedId === step.id
             return (
-              <div key={step.id} className="flex gap-3">
-                {/* Left rail */}
-                <div className="flex flex-col items-center w-7 flex-shrink-0">
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold z-10"
-                    style={{
-                      background: step.status === 'done' ? '#13d275'
-                        : step.status === 'doing' ? '#EE0669'
-                        : step.status === 'blocked' ? '#ff4861'
-                        : '#D8DFE9',
-                      color: ['todo','wait'].includes(step.status) ? '#7f88ad' : '#fff',
-                    }}
-                  >
-                    {step.status === 'done' ? <Check size={12} /> : step.id}
+              <div key={step.id} className="border-b border-border last:border-0">
+
+                {/* Step row */}
+                <div
+                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors select-none ${
+                    isOpen ? 'bg-pink-50' : 'hover:bg-bg'
+                  }`}
+                  onClick={() => toggleExpand(step.id)}
+                >
+                  {/* Chevron */}
+                  <div className="flex-shrink-0 text-info w-4">
+                    {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   </div>
-                  {!isLast && <div className="w-0.5 flex-1 bg-border min-h-4" />}
+
+                  {/* Circle */}
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                    style={{ background: stepBg(step.status), color: stepColor(step.status) }}
+                  >
+                    {step.status === 'done' ? <Check size={12} /> : step.step_number}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-[12px]">{step.title}</span>
+                      <StatusBadge status={step.status} />
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <OwnerTag name={step.owner} />
+                      <span className="text-[10px] text-info">{step.duration_label}</span>
+                      <span className="text-[10px] text-info truncate hidden sm:block">{step.description}</span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 pb-4">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-[12px]">{step.title}</span>
-                    <StatusBadge status={step.status} />
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <OwnerTag name={step.owner} />
-                    <span className="text-[10px] text-info">·</span>
-                    <span className="text-[10px] text-info">{step.duration}</span>
-                    <span className="text-[10px] text-info">·</span>
-                    <span className="text-[10px] text-info">{step.desc}</span>
-                  </div>
-                </div>
+                {/* Inline form */}
+                {isOpen && <StepForm step={step} />}
+
               </div>
             )
           })}
-        </div>
+        </Card>
       )}
 
-      {/* Fichiers */}
+      {/* ── Fichiers ── */}
       {tab === 'fichiers' && (
         <div>
           <div
-            className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all mb-4 ${dragging ? 'border-main bg-pink-50' : 'border-border hover:border-main hover:bg-pink-50'}`}
+            className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all mb-4 ${
+              dragging ? 'border-main bg-pink-50' : 'border-border hover:border-main hover:bg-pink-50'
+            }`}
             onDragOver={e => { e.preventDefault(); setDrag(true) }}
             onDragLeave={() => setDrag(false)}
             onDrop={handleDrop}
@@ -150,10 +171,10 @@ export default function ClientView({ client }) {
               <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-1">Fichiers uploadés</div>
               {files.map(f => (
                 <div key={f.name} className="flex items-center gap-2 p-2 bg-white border border-border rounded-lg text-[11px]">
-                  <span className="text-[16px]">📄</span>
+                  <span className="text-base">📄</span>
                   <span className="flex-1 truncate font-medium">{f.name}</span>
                   <span className="text-info">{(f.size / 1024).toFixed(0)} Ko</span>
-                  <button onClick={() => removeFile(f.name)} className="text-error hover:opacity-70"><X size={12} /></button>
+                  <button onClick={() => setFiles(p => p.filter(x => x.name !== f.name))} className="text-error hover:opacity-70"><X size={12} /></button>
                 </div>
               ))}
             </div>
@@ -161,22 +182,22 @@ export default function ClientView({ client }) {
         </div>
       )}
 
-      {/* Infos */}
+      {/* ── Infos ── */}
       {tab === 'infos' && (
         <Card>
           <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Informations de la campagne</div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-3">
             {[
-              { label: 'AM assigné(e)', value: client.am },
-              { label: 'Sales',         value: client.sales },
-              { label: 'Frais de setup',value: client.setup?.toLocaleString('fr-FR') + ' €' },
-              { label: 'Min. facturation', value: client.min_billing?.toLocaleString('fr-FR') + ' €/mois' },
-              { label: 'Budget média',   value: client.budget?.toLocaleString('fr-FR') + ' €/mois' },
-              { label: 'Pays',           value: client.country },
+              { label: 'AM assigné(e)',    value: client.am },
+              { label: 'Sales',            value: client.sales },
+              { label: 'Frais de setup',   value: (client.setup ?? 0).toLocaleString('fr-FR') + ' €' },
+              { label: 'Min. facturation', value: (client.min_billing ?? 0).toLocaleString('fr-FR') + ' €/mois' },
+              { label: 'Budget média',     value: (client.budget ?? 0).toLocaleString('fr-FR') + ' €/mois' },
+              { label: 'Pays',             value: client.country },
             ].map(r => (
               <div key={r.label}>
                 <div className="text-[10px] text-info uppercase tracking-wide">{r.label}</div>
-                <div className="font-semibold text-[12px] mt-0.5">{r.value}</div>
+                <div className="font-semibold text-[12px] mt-0.5">{r.value || '—'}</div>
               </div>
             ))}
           </div>
