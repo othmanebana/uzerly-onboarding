@@ -1,4 +1,4 @@
-import { useState } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, LayoutList, GanttChart, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button, Avatar, SolutionChip, StatusBadge, OwnerTag, Card, SectionHeader } from '../components/UI'
 import SmartAssistant   from '../components/SmartAssistant'
