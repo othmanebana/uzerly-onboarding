@@ -72,11 +72,11 @@ function FieldCheckbox({ field, value, onChange }) {
 // ─── Main StepForm ─────────────────────────────────────────────────────────────
 
 export default function StepForm({ step }) {
-  const schema = STEP_FIELDS[step.step_number]
+  const schema = STEP_FIELDS[_number]
   const { data, update, saving, saved } = useStepData(step.id, step.step_data || {})
 
   // --- LOGIQUE SPECIFIQUE ETAPE 1 (Affichage des données synchronisées) ---
-  if (step.step_number === 1) {
+  if (Number(step.step_number === 1) {
     const syncData = step.step_data || {}
     
     return (
