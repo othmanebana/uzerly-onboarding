@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ArrowLeft, Upload, X, Check, Loader2 } from 'lucide-react'
 import { Button, Input, Select, Card } from '../components/UI'
 import { useCreateClient } from '../hooks/useCreateClient'
-import { supabase } from '../lib/supabase' // On importe supabase pour la synchro
+import { supabase } from '../lib/supabase'
 
 const SOLUTIONS = ['Email Retargeting', 'Display Retargeting', 'OnSite', 'Acquisition']
 
@@ -54,7 +54,7 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
         await supabase
           .from('onboarding_steps')
           .update({
-            status: 'completed',
+            status: 'done', // On s'assure d'utiliser le bon tag de statut
             completed_at: new Date().toISOString(),
             step_data: {
               contact_info: {
@@ -81,11 +81,14 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
           })
           .match({ client_id: client.id, step_number: 1 });
 
-        // 3. On finalise et on redirige
-        onCreated(client)
+        // 3. Petit délai de sécurité pour la synchro BDD avant redirection
+        setTimeout(() => {
+          onCreated(client)
+        }, 500)
+
       } catch (err) {
         console.error("Erreur synchro étape 1:", err)
-        onCreated(client) // On redirige quand même si le client est créé
+        onCreated(client) 
       }
     }
   }
