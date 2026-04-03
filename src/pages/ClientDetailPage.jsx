@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, History } from 'lucide-react'
 import { Button, Avatar, SolutionChip, StatusBadge, OwnerTag, Card, SectionHeader } from '../components/UI'
 import SmartAssistant from '../components/SmartAssistant'
 import StepForm from '../components/StepForm'
+import HandoverModal from '../components/HandoverModal'
 import { STATUS_CONFIG } from '../lib/constants'
 
-// Color for the step number circle
 function stepBg(status) {
   if (status === 'done')    return '#13d275'
   if (status === 'doing')   return '#EE0669'
@@ -21,9 +21,20 @@ export default function ClientDetailPage({ client, onBack, onUpdateStep }) {
   const done  = steps.filter(s => s.status === 'done').length
   const pct   = steps.length ? Math.round((done / steps.length) * 100) : 0
 
-  // Which step is expanded (inline)
-  const [expandedId, setExpandedId] = useState(null)
+  const [expandedId,  setExpandedId]  = useState(null)
+  const [handover,    setHandover]    = useState(null)  // step object to pass to modal
+
   function toggleExpand(id) { setExpandedId(v => v === id ? null : id) }
+
+  // Called when user changes the status select
+  function handleStatusChange(step, newStatus) {
+    // If marking as 'done' → trigger handover modal
+    if (newStatus === 'done') {
+      setHandover(step)
+    }
+    // Always update the status immediately (optimistic)
+    onUpdateStep(client.id, step.id, newStatus)
+  }
 
   return (
     <div className="animate-fade-in">
@@ -36,9 +47,12 @@ export default function ClientDetailPage({ client, onBack, onUpdateStep }) {
         <Avatar initials={client.initials} size={34} />
         <div>
           <div className="font-bold text-[1rem]">{client.name}</div>
-          <div className="text-[11px] text-info">
-            AM : {client.am || '—'} · Sales : {client.sales || '—'}
-          </div>
+          <div className="text-[11px] text-info">AM : {client.am || '—'} · Sales : {client.sales || '—'}</div>
+          {client.client_main_contact_email && (
+            <div className="text-[10px] text-info mt-0.5">
+              Client : {client.client_main_contact_name} · <a href={`mailto:${client.client_main_contact_email}`} className="text-main hover:underline">{client.client_main_contact_email}</a>
+            </div>
+          )}
         </div>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
           {client.solutions.map(s => <SolutionChip key={s} name={s} />)}
@@ -54,37 +68,28 @@ export default function ClientDetailPage({ client, onBack, onUpdateStep }) {
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <span className="font-bold text-[0.85rem]">Timeline — Étapes d'onboarding</span>
           <span className="text-[11px] text-info">
-            Cliquez sur une étape pour remplir ses informations
+            Cliquez pour remplir · Passation automatique à "Terminé"
           </span>
         </div>
 
         {steps.length === 0 && (
-          <div className="text-[12px] text-info text-center py-10">
-            Aucune étape trouvée pour ce client.
-          </div>
+          <div className="text-[12px] text-info text-center py-10">Aucune étape trouvée.</div>
         )}
 
         {steps.map(step => {
           const isOpen = expandedId === step.id
-
           return (
             <div key={step.id} className="border-b border-border last:border-0">
 
-              {/* ── Step row (always visible) ── */}
+              {/* ── Step row ── */}
               <div
-                className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors select-none ${
-                  isOpen ? 'bg-pink-50' : 'hover:bg-bg'
-                }`}
+                className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors select-none ${isOpen ? 'bg-pink-50' : 'hover:bg-bg'}`}
                 onClick={() => toggleExpand(step.id)}
               >
-                {/* Expand chevron */}
                 <div className="flex-shrink-0 text-info w-4">
-                  {isOpen
-                    ? <ChevronDown size={14} />
-                    : <ChevronRight size={14} />}
+                  {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </div>
 
-                {/* Step number circle */}
                 <div
                   className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
                   style={{ background: stepBg(step.status), color: stepColor(step.status) }}
@@ -92,7 +97,6 @@ export default function ClientDetailPage({ client, onBack, onUpdateStep }) {
                   {step.step_number}
                 </div>
 
-                {/* Title + badges */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-[12px]">{step.title}</span>
@@ -103,11 +107,11 @@ export default function ClientDetailPage({ client, onBack, onUpdateStep }) {
                   <div className="text-[11px] text-info mt-0.5 truncate">{step.description}</div>
                 </div>
 
-                {/* Quick status select — stop propagation so it doesn't toggle expand */}
+                {/* Status select — stops propagation */}
                 <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
                   <select
                     value={step.status}
-                    onChange={e => onUpdateStep(client.id, step.id, e.target.value)}
+                    onChange={e => handleStatusChange(step, e.target.value)}
                     className="px-2 py-1 text-[11px] border border-border rounded-lg bg-white outline-none cursor-pointer focus:border-main"
                   >
                     {Object.entries(STATUS_CONFIG).map(([k, v]) => (
@@ -117,15 +121,22 @@ export default function ClientDetailPage({ client, onBack, onUpdateStep }) {
                 </div>
               </div>
 
-              {/* ── Inline expanded form ── */}
-              {isOpen && (
-                <StepForm step={step} />
-              )}
-
+              {/* ── Inline form ── */}
+              {isOpen && <StepForm step={step} />}
             </div>
           )
         })}
       </Card>
+
+      {/* ── Handover Modal ── */}
+      {handover && (
+        <HandoverModal
+          step={handover}
+          client={client}
+          onClose={() => setHandover(null)}
+          onConfirmed={() => setHandover(null)}
+        />
+      )}
     </div>
   )
 }

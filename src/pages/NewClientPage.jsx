@@ -1,34 +1,42 @@
 import { useState } from 'react'
 import { ArrowLeft, Upload, X, Check, Loader2 } from 'lucide-react'
-import { Button, Input, Select, Card, SectionHeader } from '../components/UI'
+import { Button, Input, Select, Card } from '../components/UI'
 import { useCreateClient } from '../hooks/useCreateClient'
 
 const SOLUTIONS = ['Email Retargeting', 'Display Retargeting', 'OnSite', 'Acquisition']
 
-export default function NewClientPage({ onBack, onCreated }) {
+export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
   const { submit, loading, error } = useCreateClient()
 
-  const [form, setForm]         = useState({
+  const [form, setForm] = useState({
     name: '', country: 'France', city: '', phone: '',
     activity_desc: '', setup_fee: '', min_billing: '',
-    am: 'Julie M.', sales: 'Pierre R.', notes: '',
+    am: '', sales: '', notes: '',
+    // Contacts
+    client_main_contact_name:  '',
+    client_main_contact_email: '',
+    client_tech_contact_name:  '',
+    client_tech_contact_email: '',
+    // Campaign
     sender_name: '', commission_type: '% sur vente',
     commission_value: '', monthly_budget: '',
+    networks: '', excluded_networks: '',
   })
-  const [solutions, setSolutions] = useState([])
-  const [files, setFiles]         = useState([])
-  const [dragging, setDragging]   = useState(false)
-  const [fieldErrors, setFieldErrors] = useState({})
+  const [solutions,    setSolutions]    = useState([])
+  const [files,        setFiles]        = useState([])
+  const [dragging,     setDragging]     = useState(false)
+  const [fieldErrors,  setFieldErrors]  = useState({})
+
+  const amList    = teamMembers.filter(m => m.role === 'AM')
+  const salesList = teamMembers.filter(m => m.role === 'Sales')
 
   function set(key, value) { setForm(f => ({ ...f, [key]: value })) }
-  function toggleSol(s) { setSolutions(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]) }
+  function toggleSol(s)    { setSolutions(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]) }
 
   function validate() {
     const errs = {}
     if (!form.name.trim()) errs.name = 'Champ obligatoire'
     if (!solutions.length) errs.solutions = 'Sélectionnez au moins une solution'
-    const hasBDC = files.some(f => f.name.toLowerCase().includes('bdc'))
-    if (!hasBDC) errs.bdc = 'Le BDC signé est obligatoire'
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -48,7 +56,7 @@ export default function NewClientPage({ onBack, onCreated }) {
   const hasDisplay = solutions.includes('Display Retargeting')
 
   return (
-    <div className="animate-fade-in max-w-4xl">
+    <div className="animate-fade-in max-w-5xl">
       <div className="flex items-center gap-3 mb-5">
         <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft size={14} /> Retour</Button>
         <h1 className="text-[1rem] font-bold">Nouveau Client</h1>
@@ -56,13 +64,15 @@ export default function NewClientPage({ onBack, onCreated }) {
 
       {error && (
         <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[12px] text-error font-medium">
-          ⚠ Erreur Supabase : {error}
+          ⚠ Erreur : {error}
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        {/* Left */}
+        {/* ── Col gauche ── */}
         <div className="space-y-4">
+
+          {/* Infos client */}
           <Card>
             <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Informations Client</div>
             <div className="grid grid-cols-2 gap-3">
@@ -77,39 +87,56 @@ export default function NewClientPage({ onBack, onCreated }) {
             <div className="mb-3">
               <label className="block text-[11px] font-bold text-info uppercase tracking-wide mb-1">Descriptif activité</label>
               <textarea rows={2} className="w-full px-3 py-2 border border-border rounded-lg text-[12px] outline-none focus:border-main resize-none"
-                placeholder="E-commerce mode, 2M visiteurs/mois…"
-                value={form.activity_desc} onChange={e => set('activity_desc', e.target.value)} />
+                value={form.activity_desc} onChange={e => set('activity_desc', e.target.value)} placeholder="E-commerce mode, 2M visiteurs/mois…" />
             </div>
-
-            <div className="border-t border-border pt-3">
-              <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Frais</div>
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Setup (€)" type="number" placeholder="1200" value={form.setup_fee} onChange={e => set('setup_fee', e.target.value)} />
-                <Input label="Min. facturation (€)" type="number" placeholder="500" value={form.min_billing} onChange={e => set('min_billing', e.target.value)} />
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Frais setup (€)" type="number" value={form.setup_fee} onChange={e => set('setup_fee', e.target.value)} placeholder="1200" />
+              <Input label="Min. facturation (€)" type="number" value={form.min_billing} onChange={e => set('min_billing', e.target.value)} placeholder="500" />
             </div>
+          </Card>
 
-            <div className="border-t border-border pt-3">
-              <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Équipe</div>
-              <div className="grid grid-cols-2 gap-3">
-                <Select label="AM assigné(e)" value={form.am} onChange={e => set('am', e.target.value)}>
-                  {['Julie M.','Marc T.','Nadia K.'].map(v => <option key={v}>{v}</option>)}
-                </Select>
-                <Select label="Sales" value={form.sales} onChange={e => set('sales', e.target.value)}>
-                  {['Pierre R.','Sophie L.','Tom B.'].map(v => <option key={v}>{v}</option>)}
-                </Select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-info uppercase tracking-wide mb-1">Notes deal</label>
-                <textarea rows={2} className="w-full px-3 py-2 border border-border rounded-lg text-[12px] outline-none focus:border-main resize-none"
-                  value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Contexte particulier, points à retenir…" />
-              </div>
+          {/* Contacts client */}
+          <Card>
+            <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Contacts Client</div>
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Contact principal — Nom"  value={form.client_main_contact_name}  onChange={e => set('client_main_contact_name',  e.target.value)} placeholder="Marie Dupont" />
+              <Input label="Contact principal — Email" type="email" value={form.client_main_contact_email} onChange={e => set('client_main_contact_email', e.target.value)} placeholder="marie@client.fr" />
+              <Input label="Contact technique — Nom"  value={form.client_tech_contact_name}  onChange={e => set('client_tech_contact_name',  e.target.value)} placeholder="Jean Martin" />
+              <Input label="Contact technique — Email" type="email" value={form.client_tech_contact_email} onChange={e => set('client_tech_contact_email', e.target.value)} placeholder="jean@client.fr" />
+            </div>
+          </Card>
+
+          {/* Équipe interne */}
+          <Card>
+            <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Équipe Uzerly</div>
+            <div className="grid grid-cols-2 gap-3">
+              <Select label="AM assigné(e)" value={form.am} onChange={e => set('am', e.target.value)}>
+                <option value="">— Choisir —</option>
+                {amList.length
+                  ? amList.map(m => <option key={m.id} value={m.name}>{m.name}</option>)
+                  : ['Julie M.','Marc T.','Nadia K.'].map(v => <option key={v} value={v}>{v}</option>)
+                }
+              </Select>
+              <Select label="Sales" value={form.sales} onChange={e => set('sales', e.target.value)}>
+                <option value="">— Choisir —</option>
+                {salesList.length
+                  ? salesList.map(m => <option key={m.id} value={m.name}>{m.name}</option>)
+                  : ['Pierre R.','Sophie L.','Tom B.'].map(v => <option key={v} value={v}>{v}</option>)
+                }
+              </Select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-info uppercase tracking-wide mb-1">Notes deal</label>
+              <textarea rows={2} className="w-full px-3 py-2 border border-border rounded-lg text-[12px] outline-none focus:border-main resize-none"
+                value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Contexte particulier, points à retenir…" />
             </div>
           </Card>
         </div>
 
-        {/* Right */}
+        {/* ── Col droite ── */}
         <div className="space-y-4">
+
+          {/* Solutions */}
           <Card>
             <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Solutions choisies *</div>
             {fieldErrors.solutions && <p className="text-[10px] text-error mb-2">{fieldErrors.solutions}</p>}
@@ -130,7 +157,7 @@ export default function NewClientPage({ onBack, onCreated }) {
                   <Select label="Type commission" value={form.commission_type} onChange={e => set('commission_type', e.target.value)}>
                     {['% sur vente','Fixe / vente','CPC','Mensuel fixe'].map(v => <option key={v}>{v}</option>)}
                   </Select>
-                  <Input label="Valeur" placeholder="15" value={form.commission_value} onChange={e => set('commission_value', e.target.value)} />
+                  <Input label="Valeur commission" placeholder="15" value={form.commission_value} onChange={e => set('commission_value', e.target.value)} />
                 </div>
               </div>
             )}
@@ -138,14 +165,17 @@ export default function NewClientPage({ onBack, onCreated }) {
             {hasDisplay && (
               <div className="bg-purple-50 rounded-xl p-3 mb-2">
                 <div className="text-[10px] font-bold text-purple-700 uppercase tracking-wide mb-2">Config Display</div>
-                <Input label="Budget mensuel (€)" placeholder="3000" value={form.monthly_budget} onChange={e => set('monthly_budget', e.target.value)} />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input label="Budget mensuel (€)" placeholder="3000" value={form.monthly_budget} onChange={e => set('monthly_budget', e.target.value)} />
+                  <Input label="Réseaux exclus" placeholder="ex. SEM" value={form.excluded_networks} onChange={e => set('excluded_networks', e.target.value)} />
+                </div>
               </div>
             )}
           </Card>
 
+          {/* Documents */}
           <Card>
             <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Documents</div>
-            {fieldErrors.bdc && <p className="text-[10px] text-error mb-2">{fieldErrors.bdc}</p>}
             <div
               className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all mb-3 ${dragging ? 'border-main bg-pink-50' : 'border-border hover:border-main hover:bg-pink-50'}`}
               onDragOver={e => { e.preventDefault(); setDragging(true) }}
@@ -171,11 +201,12 @@ export default function NewClientPage({ onBack, onCreated }) {
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex justify-end gap-3 mt-5 pt-4 border-t border-border">
         <Button variant="default" onClick={onBack} disabled={loading}>Annuler</Button>
         <Button variant="primary" onClick={handleSubmit} disabled={loading}>
-          {loading ? <><Loader2 size={13} className="animate-spin" /> Création…</> : 'Créer le client & démarrer l\'onboarding →'}
+          {loading
+            ? <><Loader2 size={13} className="animate-spin" /> Création & webhook…</>
+            : 'Créer le client & démarrer l\'onboarding →'}
         </Button>
       </div>
     </div>
