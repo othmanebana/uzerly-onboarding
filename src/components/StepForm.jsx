@@ -72,12 +72,18 @@ function FieldCheckbox({ field, value, onChange }) {
 // ─── Main StepForm ─────────────────────────────────────────────────────────────
 
 export default function StepForm({ step }) {
-  const schema = STEP_FIELDS[_number]
-  const { data, update, saving, saved } = useStepData(step.id, step.step_data || {})
+  // 1. On s'assure d'avoir le numéro de l'étape (pour le schéma et le test)
+  const stepNumber = Number(step.step_number);
+  
+  // 2. On récupère le schéma correspondant (ex: STEP_FIELDS[1])
+  const schema = STEP_FIELDS[stepNumber];
+  
+  // 3. Le hook pour gérer les données (on passe step.step_data comme valeur initiale)
+  const { data, update, saving, saved } = useStepData(step.id, step.step_data || {});
 
   // --- LOGIQUE SPECIFIQUE ETAPE 1 (Affichage des données synchronisées) ---
-  if (Number(step.step_number) === 1) {
-    const syncData = step.step_data || {}
+  if (stepNumber === 1) {
+    const syncData = step.step_data || {};
     
     return (
       <div className="px-4 py-4 space-y-4 animate-fade-in">
@@ -100,6 +106,8 @@ export default function StepForm({ step }) {
             </div>
           </div>
         </div>
+        
+        {/* Le reste de ton code (Section Config et Info) reste identique... */}
 
         {/* Section Config */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
