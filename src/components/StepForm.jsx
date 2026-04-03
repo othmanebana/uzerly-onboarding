@@ -76,7 +76,7 @@ export default function StepForm({ step }) {
   const { data, update, saving, saved } = useStepData(step.id, step.step_data || {})
 
   // --- LOGIQUE SPECIFIQUE ETAPE 1 (Affichage des données synchronisées) ---
-  if (Number(step.step_number === 1) {
+  if (Number(step.step_number) === 1) {
     const syncData = step.step_data || {}
     
     return (
