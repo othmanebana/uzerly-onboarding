@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArrowLeft, Upload, X, Check, Loader2 } from 'lucide-react'
 import { Button, Input, Select, Card } from '../components/UI'
 import { useCreateClient } from '../hooks/useCreateClient'
+import { supabase } from '../lib/supabase' // On importe supabase pour la synchro
 
 const SOLUTIONS = ['Email Retargeting', 'Display Retargeting', 'OnSite', 'Acquisition']
 
@@ -43,8 +44,50 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
 
   async function handleSubmit() {
     if (!validate()) return
+    
+    // 1. Création du client via le hook
     const client = await submit({ ...form, solutions })
-    if (client) onCreated(client)
+    
+    if (client && client.id) {
+      try {
+        // 2. Synchronisation immédiate avec l'Étape 1 (onboarding_steps)
+        await supabase
+          .from('onboarding_steps')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            step_data: {
+              contact_info: {
+                main_name: form.client_main_contact_name,
+                main_email: form.client_main_contact_email,
+                tech_name: form.client_tech_contact_name,
+                tech_email: form.client_tech_contact_email
+              },
+              business_terms: {
+                setup_fee: form.setup_fee,
+                min_billing: form.min_billing,
+                solutions: solutions
+              },
+              campaign_details: {
+                sender: form.sender_name,
+                budget: form.monthly_budget,
+                commission: `${form.commission_value} ${form.commission_type}`,
+                excluded: form.excluded_networks
+              },
+              assigned_team: { am: form.am, sales: form.sales },
+              notes: form.notes,
+              files_count: files.length
+            }
+          })
+          .match({ client_id: client.id, step_number: 1 });
+
+        // 3. On finalise et on redirige
+        onCreated(client)
+      } catch (err) {
+        console.error("Erreur synchro étape 1:", err)
+        onCreated(client) // On redirige quand même si le client est créé
+      }
+    }
   }
 
   function handleDrop(e) {
@@ -71,8 +114,6 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
       <div className="grid grid-cols-2 gap-4">
         {/* ── Col gauche ── */}
         <div className="space-y-4">
-
-          {/* Infos client */}
           <Card>
             <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Informations Client</div>
             <div className="grid grid-cols-2 gap-3">
@@ -95,7 +136,6 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
             </div>
           </Card>
 
-          {/* Contacts client */}
           <Card>
             <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Contacts Client</div>
             <div className="grid grid-cols-2 gap-3">
@@ -106,7 +146,6 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
             </div>
           </Card>
 
-          {/* Équipe interne */}
           <Card>
             <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Équipe Uzerly</div>
             <div className="grid grid-cols-2 gap-3">
@@ -135,8 +174,6 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
 
         {/* ── Col droite ── */}
         <div className="space-y-4">
-
-          {/* Solutions */}
           <Card>
             <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Solutions choisies *</div>
             {fieldErrors.solutions && <p className="text-[10px] text-error mb-2">{fieldErrors.solutions}</p>}
@@ -173,7 +210,6 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
             )}
           </Card>
 
-          {/* Documents */}
           <Card>
             <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Documents</div>
             <div
@@ -205,7 +241,7 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
         <Button variant="default" onClick={onBack} disabled={loading}>Annuler</Button>
         <Button variant="primary" onClick={handleSubmit} disabled={loading}>
           {loading
-            ? <><Loader2 size={13} className="animate-spin" /> Création & webhook…</>
+            ? <><Loader2 size={13} className="animate-spin" /> Création & synchro…</>
             : 'Créer le client & démarrer l\'onboarding →'}
         </Button>
       </div>
