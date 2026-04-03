@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Save, Loader2, Check } from 'lucide-react'
+import { X, Save, Loader2, Check, User, Target, Zap } from 'lucide-react'
 import StepForm from './StepForm'
 import { formatDate } from '../lib/timelineUtils'
 
@@ -19,7 +19,7 @@ export default function StepDetailDrawer({ step, client, onClose, onUpdateDates,
   }
 
   return (
-    <div className="border-t border-border bg-white animate-fade-in">
+    <div className="border-t border-border bg-white animate-fade-in shadow-2xl">
       {/* Drawer header */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-bg border-b border-border">
         <div className="flex items-center gap-2">
@@ -58,7 +58,7 @@ export default function StepDetailDrawer({ step, client, onClose, onUpdateDates,
                 type="date"
                 value={dueDate}
                 onChange={e => setDueDate(e.target.value)}
-                className="px-2 py-1 border border-border rounded-lg text-[12px] outline-none focus:border-main bg-white"
+                className="px-2 py-1 border border-border rounded-lg text-[12px] outline-none focus:border-main bg-white w-full"
               />
               <button
                 onClick={saveDueDate}
@@ -75,9 +75,15 @@ export default function StepDetailDrawer({ step, client, onClose, onUpdateDates,
             <select
               value={step.status}
               onChange={e => onUpdateStatus?.(step.id, e.target.value)}
-              className="px-2 py-1 border border-border rounded-lg text-[12px] outline-none focus:border-main bg-white cursor-pointer"
+              className="w-full px-2 py-1 border border-border rounded-lg text-[12px] outline-none focus:border-main bg-white cursor-pointer"
             >
-              {[['todo','À faire'],['doing','En cours'],['wait','En attente'],['blocked','Bloqué'],['done','Terminé']].map(([v,l]) => (
+              {[
+                ['todo','À faire'],
+                ['doing','En cours'],
+                ['wait','En attente'],
+                ['blocked','Bloqué'],
+                ['done','Terminé']
+              ].map(([v,l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
             </select>
@@ -85,9 +91,49 @@ export default function StepDetailDrawer({ step, client, onClose, onUpdateDates,
         </div>
       </div>
 
-      {/* Reuse existing StepForm for data fields */}
-      <div className="max-h-72 overflow-y-auto">
-        <StepForm step={step} />
+      {/* Content Area */}
+      <div className="max-h-80 overflow-y-auto px-4 py-4">
+        
+        {/* --- FOCUS ETAPE 1 : Données pré-remplies --- */}
+        {step.step_number === 1 && step.step_data && (
+          <div className="grid grid-cols-2 gap-4 mb-6 animate-in slide-in-from-top-2 duration-300">
+            <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2 text-blue-600">
+                <User size={14} />
+                <h4 className="text-[11px] font-bold uppercase tracking-wider">Contacts saisis au setup</h4>
+              </div>
+              <div className="text-[12px] space-y-1 text-slate-700">
+                <p><strong>Principal :</strong> {step.step_data.contact_info?.main_name || 'Non saisi'}</p>
+                <p className="text-[11px] text-slate-500 ml-4">{step.step_data.contact_info?.main_email}</p>
+                <div className="pt-1 mt-1 border-t border-blue-100/50">
+                  <p><strong>Technique :</strong> {step.step_data.contact_info?.tech_name || 'Non saisi'}</p>
+                  <p className="text-[11px] text-slate-500 ml-4">{step.step_data.contact_info?.tech_email}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-pink-50/50 border border-pink-100 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2 text-pink-600">
+                <Target size={14} />
+                <h4 className="text-[11px] font-bold uppercase tracking-wider">Config Commerciale</h4>
+              </div>
+              <div className="text-[12px] space-y-1 text-slate-700">
+                <p><strong>Solutions :</strong> {step.step_data.business_terms?.solutions?.join(', ') || 'N/A'}</p>
+                <p><strong>Budget :</strong> {step.step_data.campaign_details?.budget || '0'} €</p>
+                <p><strong>Commission :</strong> {step.step_data.campaign_details?.commission}</p>
+                <div className="flex items-center gap-1 mt-2 text-[10px] text-pink-500 font-medium">
+                  <Zap size={10} /> Sync automatique active
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- FORMULAIRE STANDARD (StepForm) --- */}
+        <div className="border-t border-slate-100 pt-4">
+          <div className="text-[10px] font-bold text-info uppercase tracking-wide mb-3">Détails de l'étape</div>
+          <StepForm step={step} />
+        </div>
       </div>
     </div>
   )
