@@ -11,7 +11,18 @@ export async function getClients() {
   const { data, error } = await supabase
     .from('uz_clients')
     .select(`*, uz_campaigns_config(*), uz_onboarding_steps(*), uz_relance_rules(*)`)
+    .eq('archived', false)
     .order('created_at', { ascending: false })
+  if (error) throw error
+  return data.map(normalizeClient)
+}
+
+export async function getArchivedClients() {
+  const { data, error } = await supabase
+    .from('uz_clients')
+    .select(`*, uz_campaigns_config(*), uz_onboarding_steps(*), uz_relance_rules(*)`)
+    .eq('archived', true)
+    .order('archived_at', { ascending: false })
   if (error) throw error
   return data.map(normalizeClient)
 }
@@ -26,11 +37,33 @@ export async function getClientById(id) {
   return normalizeClient(data)
 }
 
+export async function archiveClient(clientId, reason = '') {
+  const { error } = await supabase
+    .from('uz_clients')
+    .update({
+      archived: true,
+      archived_at: new Date().toISOString(),
+      archived_reason: reason,
+    })
+    .eq('id', clientId)
+  if (error) throw error
+}
+
+export async function unarchiveClient(clientId) {
+  const { error } = await supabase
+    .from('uz_clients')
+    .update({
+      archived: false,
+      archived_at: null,
+      archived_reason: null,
+    })
+    .eq('id', clientId)
+  if (error) throw error
+}
+
 export async function createClient_(payload) {
-  // 1. Get step template from global_config
   const template = await getStepTemplate()
 
-  // 2. Insert client
   const { data: client, error: clientError } = await supabase
     .from('uz_clients')
     .insert([{
@@ -48,12 +81,12 @@ export async function createClient_(payload) {
       client_main_contact_email: payload.client_main_contact_email,
       client_tech_contact_name: payload.client_tech_contact_name,
       client_tech_contact_email: payload.client_tech_contact_email,
+      archived: false,
     }])
     .select()
     .single()
   if (clientError) throw clientError
 
-  // 3. Insert campaigns
   if (payload.solutions?.length) {
     const campaigns = payload.solutions.map(sol => ({
       client_id: client.id,
@@ -69,8 +102,6 @@ export async function createClient_(payload) {
     if (campError) throw campError
   }
 
-  // 4. Create onboarding steps from template
-  // ✅ FIX : step_data de l'étape 1 rempli directement à la création
   const steps = template.map(t => ({
     client_id: client.id,
     step_number: t.step_number,
@@ -119,7 +150,6 @@ export async function createClient_(payload) {
   const { error: stepsError } = await supabase.from('uz_onboarding_steps').insert(steps)
   if (stepsError) throw stepsError
 
-  // 5. Create default relance rules
   const { error: relanceError } = await supabase.from('uz_relance_rules').insert([{
     client_id: client.id,
     paused: false,
@@ -130,7 +160,6 @@ export async function createClient_(payload) {
   }])
   if (relanceError) console.warn('uz_relance_rules insert warn:', relanceError)
 
-  // 6. Fire webhook
   await fireWebhook(client, payload)
 
   return client
@@ -316,12 +345,13 @@ export async function incrementDownloadCount(id) {
   })
 }
 
-// ─── CLIENTS (alias pour RelanceRules page) ──────────────────────────────────
+// ─── CLIENTS simple (RelanceRules) ───────────────────────────────────────────
 
 export async function getClients_simple() {
   const { data, error } = await supabase
     .from('uz_clients')
     .select(`*, uz_relance_rules(*)`)
+    .eq('archived', false)
     .order('created_at', { ascending: false })
   if (error) throw error
   return data.map(c => ({
@@ -331,7 +361,7 @@ export async function getClients_simple() {
   }))
 }
 
-// ─── WEBHOOK (dual format) ───────────────────────────────────────────────────
+// ─── WEBHOOK ─────────────────────────────────────────────────────────────────
 
 async function fireWebhook(client, payload) {
   const webhookUrl = import.meta.env.VITE_WEBHOOK_URL
@@ -445,6 +475,9 @@ function normalizeClient(raw) {
     steps,
     campaigns: raw.uz_campaigns_config || [],
     relance: raw.uz_relance_rules?.[0] || null,
+    archived: raw.archived || false,
+    archived_at: raw.archived_at || null,
+    archived_reason: raw.archived_reason || '',
     created_at: raw.created_at,
   }
 }
