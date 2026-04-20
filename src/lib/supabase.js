@@ -70,6 +70,7 @@ export async function createClient_(payload) {
   }
 
   // 4. Create onboarding steps from template
+  // ✅ FIX : step_data de l'étape 1 rempli directement à la création
   const steps = template.map(t => ({
     client_id: client.id,
     step_number: t.step_number,
@@ -80,7 +81,41 @@ export async function createClient_(payload) {
     description: t.description,
     step_data: {},
   }))
-  if (steps[0]) steps[0].status = 'done'
+
+  if (steps[0]) {
+    steps[0].status = 'done'
+    steps[0].step_data = {
+      contact_info: {
+        main_name:  payload.client_main_contact_name  || '',
+        main_email: payload.client_main_contact_email || '',
+        tech_name:  payload.client_tech_contact_name  || '',
+        tech_email: payload.client_tech_contact_email || '',
+      },
+      business_terms: {
+        setup_fee:   payload.setup_fee   || '',
+        min_billing: payload.min_billing || '',
+        solutions:   payload.solutions   || [],
+      },
+      campaign_details: {
+        sender:     payload.sender_name       || '',
+        budget:     payload.monthly_budget    || '',
+        commission: `${payload.commission_value || ''} ${payload.commission_type || ''}`.trim(),
+        networks:   payload.networks          || '',
+        excluded:   payload.excluded_networks || '',
+      },
+      assigned_team: {
+        am:    payload.am    || '',
+        sales: payload.sales || '',
+      },
+      notes:       payload.notes         || '',
+      activity:    payload.activity_desc || '',
+      client_name: payload.name          || '',
+      country:     payload.country       || '',
+      city:        payload.city          || '',
+      phone:       payload.phone         || '',
+    }
+  }
+
   const { error: stepsError } = await supabase.from('uz_onboarding_steps').insert(steps)
   if (stepsError) throw stepsError
 
@@ -127,7 +162,6 @@ export async function getTeamMembers() {
 }
 
 export async function createTeamMember(payload) {
-  // FIX: forcer active:true pour que le membre apparaisse dans la liste
   const { data, error } = await supabase
     .from('uz_team_members')
     .insert([{ ...payload, active: true }])
@@ -138,7 +172,6 @@ export async function createTeamMember(payload) {
 }
 
 export async function deleteTeamMember(id) {
-  // Soft delete
   const { error } = await supabase
     .from('uz_team_members')
     .update({ active: false })
@@ -397,7 +430,6 @@ function normalizeClient(raw) {
     am: raw.am,
     sales: raw.sales,
     notes: raw.notes,
-    // FIX: cast explicite en Number pour éviter la concaténation de strings dans APIPage
     setup: Number(raw.setup_fee) || 0,
     min_billing: Number(raw.min_billing) || 0,
     budget: Number(raw.uz_campaigns_config?.[0]?.monthly_budget) || 0,
