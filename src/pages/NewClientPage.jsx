@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { ArrowLeft, Upload, X, Check, Loader2 } from 'lucide-react'
 import { Button, Input, Select, Card } from '../components/UI'
 import { useCreateClient } from '../hooks/useCreateClient'
-import { supabase } from '../lib/supabase'
 
 const SOLUTIONS = ['Email Retargeting', 'Display Retargeting', 'OnSite', 'Acquisition']
 
@@ -42,54 +41,17 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
     return Object.keys(errs).length === 0
   }
 
+  // ✅ FIX : handleSubmit simplifié — createClient_() dans supabase.js
+  // gère maintenant step_data de l'étape 1 en une seule passe.
+  // Plus besoin du second .update() qui ciblait la mauvaise table.
   async function handleSubmit() {
     if (!validate()) return
-    
-    // 1. Création du client via le hook
+
     const client = await submit({ ...form, solutions })
-    
+
     if (client && client.id) {
-      try {
-        // 2. Synchronisation immédiate avec l'Étape 1 (onboarding_steps)
-        await supabase
-          .from('onboarding_steps')
-          .update({
-            status: 'done', // On s'assure d'utiliser le bon tag de statut
-            completed_at: new Date().toISOString(),
-            step_data: {
-              contact_info: {
-                main_name: form.client_main_contact_name,
-                main_email: form.client_main_contact_email,
-                tech_name: form.client_tech_contact_name,
-                tech_email: form.client_tech_contact_email
-              },
-              business_terms: {
-                setup_fee: form.setup_fee,
-                min_billing: form.min_billing,
-                solutions: solutions
-              },
-              campaign_details: {
-                sender: form.sender_name,
-                budget: form.monthly_budget,
-                commission: `${form.commission_value} ${form.commission_type}`,
-                excluded: form.excluded_networks
-              },
-              assigned_team: { am: form.am, sales: form.sales },
-              notes: form.notes,
-              files_count: files.length
-            }
-          })
-          .match({ client_id: client.id, step_number: 1 });
-
-        // 3. Petit délai de sécurité pour la synchro BDD avant redirection
-        setTimeout(() => {
-          onCreated(client)
-        }, 500)
-
-      } catch (err) {
-        console.error("Erreur synchro étape 1:", err)
-        onCreated(client) 
-      }
+      // Petit délai pour que Supabase propage avant navigation
+      setTimeout(() => onCreated(client), 300)
     }
   }
 
@@ -244,7 +206,7 @@ export default function NewClientPage({ onBack, onCreated, teamMembers = [] }) {
         <Button variant="default" onClick={onBack} disabled={loading}>Annuler</Button>
         <Button variant="primary" onClick={handleSubmit} disabled={loading}>
           {loading
-            ? <><Loader2 size={13} className="animate-spin" /> Création & synchro…</>
+            ? <><Loader2 size={13} className="animate-spin" /> Création en cours…</>
             : 'Créer le client & démarrer l\'onboarding →'}
         </Button>
       </div>
