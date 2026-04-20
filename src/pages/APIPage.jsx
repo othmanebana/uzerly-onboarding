@@ -24,22 +24,31 @@ function CodeBlock({ json }) {
 export default function APIPage({ clients = [] }) {
   if (!clients.length) return <LoadingSpinner message="Chargement des données…" />
 
-  const totalSetup    = clients.reduce((s, c) => s + (c.setup ?? 0), 0)
-  const totalBudget   = clients.reduce((s, c) => s + (c.budget ?? 0), 0)
-  const avgMinBilling = Math.round(clients.reduce((s, c) => s + (c.min_billing ?? 0), 0) / clients.length)
+  // FIX: cast explicite en Number() pour éviter la concaténation de strings
+  const totalSetup = clients.reduce((s, c) => s + (Number(c.setup) || 0), 0)
+  const totalBudget = clients.reduce((s, c) => s + (Number(c.budget) || 0), 0)
+  const avgMinBilling = Math.round(
+    clients.reduce((s, c) => s + (Number(c.min_billing) || 0), 0) / clients.length
+  )
 
   const metrics = [
-    { label: 'Revenus setup total',     value: totalSetup.toLocaleString('fr-FR') + ' €',       color: '#EE0669' },
-    { label: 'Budget média total/mois', value: (totalBudget / 1000).toFixed(1) + 'k €',          color: '#7f88ad' },
-    { label: 'Min. facturation moyen',  value: avgMinBilling.toLocaleString('fr-FR') + ' €',     color: '#13d275' },
-    { label: 'Clients actifs',          value: clients.length,                                    color: '#f59e0b' },
+    { label: 'Revenus setup total', value: totalSetup.toLocaleString('fr-FR') + ' €', color: '#EE0669' },
+    { label: 'Budget média total/mois', value: totalBudget >= 1000 ? (totalBudget / 1000).toFixed(1) + 'k €' : totalBudget.toLocaleString('fr-FR') + ' €', color: '#7f88ad' },
+    { label: 'Min. facturation moyen', value: avgMinBilling.toLocaleString('fr-FR') + ' €', color: '#13d275' },
+    { label: 'Clients actifs', value: clients.length, color: '#f59e0b' },
   ]
 
   const payload = clients.map(c => ({
-    id: c.id, name: c.name, solutions: c.solutions,
-    am: c.am, sales: c.sales,
-    setup_fee: c.setup, min_billing: c.min_billing, monthly_budget: c.budget,
-    progress_pct: c.progress, status: c.status,
+    id: c.id,
+    name: c.name,
+    solutions: c.solutions,
+    am: c.am,
+    sales: c.sales,
+    setup_fee: c.setup,
+    min_billing: c.min_billing,
+    monthly_budget: c.budget,
+    progress_pct: c.progress,
+    status: c.status,
   }))
 
   function exportJSON() {
@@ -83,7 +92,7 @@ export default function APIPage({ clients = [] }) {
         <table className="w-full text-[11px]">
           <thead>
             <tr className="border-b border-border">
-              {['Client','Solutions','Setup','Min. fact.','Budget/mois','Progression'].map(h => (
+              {['Client', 'Solutions', 'Setup', 'Min. fact.', 'Budget/mois', 'Progression'].map(h => (
                 <th key={h} className="px-4 py-2 text-left text-[10px] font-bold text-info uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -93,9 +102,9 @@ export default function APIPage({ clients = [] }) {
               <tr key={c.id} className="border-b border-border last:border-0 hover:bg-bg">
                 <td className="px-4 py-2.5 font-semibold">{c.name}</td>
                 <td className="px-4 py-2.5 text-info">{c.solutions.join(', ') || '—'}</td>
-                <td className="px-4 py-2.5">{(c.setup ?? 0).toLocaleString('fr-FR')} €</td>
-                <td className="px-4 py-2.5">{(c.min_billing ?? 0).toLocaleString('fr-FR')} €</td>
-                <td className="px-4 py-2.5">{(c.budget ?? 0).toLocaleString('fr-FR')} €</td>
+                <td className="px-4 py-2.5">{(Number(c.setup) || 0).toLocaleString('fr-FR')} €</td>
+                <td className="px-4 py-2.5">{(Number(c.min_billing) || 0).toLocaleString('fr-FR')} €</td>
+                <td className="px-4 py-2.5">{(Number(c.budget) || 0).toLocaleString('fr-FR')} €</td>
                 <td className="px-4 py-2.5 font-bold" style={{ color: '#EE0669' }}>{c.progress}%</td>
               </tr>
             ))}
